@@ -1,42 +1,33 @@
-import { defineConfig, loadEnv } from "vite"
-import vue from "@vitejs/plugin-vue"
-import path from "path"
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
+import { internalIpV4 } from "internal-ip"
 
-export default defineConfig((config) => {
-  const { mode } = config
+// @ts-expect-error process is a nodejs global
+const mobile = !!/android|ios/.test(process.env.TAURI_ENV_PLATFORM)
 
-  // .env
-  const root = process.cwd()
-  const { VITE_SERVER_PORT, VITE_SERVER_PROXY } = loadEnv(
-    mode,
-    root,
-  ) as unknown as ImportMetaEnv
+// https://vitejs.dev/config/
+export default defineConfig(async () => ({
+  plugins: [react()],
 
-  return {
-    resolve: {
-      alias: {
-        "@": path.resolve(__dirname, "./src"),
-      },
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
+  server: {
+    port: 1420,
+    strictPort: true,
+    host: mobile ? "0.0.0.0" : false,
+    hmr: mobile
+      ? {
+          protocol: "ws",
+          host: await internalIpV4(),
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      // 3. tell vite to ignore watching `src-tauri`
+      ignored: ["**/src-tauri/**"],
     },
-    plugins: [vue()],
-    server: {
-      port: VITE_SERVER_PORT || 3000,
-      // 此处默认转换 /api, 未做通用处理...
-      proxy: VITE_SERVER_PROXY && {
-        "/api": {
-          target: VITE_SERVER_PROXY ?? "",
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ""),
-        },
-      },
-    },
-  }
-})
-
-// 环境变量
-// 如果需要在 src 内使用，请同时更新 src/env.d.ts
-// https://cn.vitejs.dev/guide/env-and-mode.html#intellisense
-interface ImportMetaEnv {
-  readonly VITE_SERVER_PORT: number
-  readonly VITE_SERVER_PROXY: string
-}
+  },
+}))
