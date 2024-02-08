@@ -8,6 +8,7 @@ export default defineFlatConfig(
     {
       rules: {
         "import/no-default-export": "off",
+        "react-hooks/exhaustive-deps": "off",
       },
     },
   ],
